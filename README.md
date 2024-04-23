@@ -31,7 +31,11 @@ Special tokens have been added in the vocabulary, make sure the associated word 
 completion:
 print('helloworld'[::-1])
 
->
+> import numpy as
+completion:
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers import
 ```
 
 Btw, you can run `/exit` to exit the program.
