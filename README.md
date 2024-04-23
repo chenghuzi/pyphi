@@ -7,6 +7,8 @@ The model is based on Microsoft's recent [Phi-2](https://huggingface.co/microsof
 
 You can find the training progress [here](https://api.wandb.ai/links/chenghuzi/c1a9vy8m).
 
+The model checkpoint is served on a huggingface repo [chenghuzi/pyphi](https://huggingface.co/chenghuzi/pyphi).
+
 ## Quickstart
 
 Clone the repo first. Make sure you have at least python 3.10 and cuda installed.
