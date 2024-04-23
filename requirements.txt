@@ -1,0 +1,14 @@
+transformers
+torch
+datasets
+bitsandbytes
+wandb
+accelerate
+bitsandbytes
+numpy
+evaluate
+peft
+scikit-learn
+click
+pyyaml
+ipdb
