@@ -41,14 +41,15 @@ def finetune(ctx,
     chkpts_dir = 'chkpts'
 
     if dev is True:
-        split = 'train[:2000]'
+        split = 'train[:6000]'
     else:
-        split = 'train[:20000]'  # chang this to a larger number in the future
+        split = 'train[:80000]'  # change this to a larger number in the future
     ds = load_dataset("ArtifactAI/arxiv_python_research_code",
                       split=split).filter(lambda x: len(x['code']) >= 500)
     train_test_split = ds.train_test_split(test_size=0.2)
     train_dataset = train_test_split["train"]
     test_dataset = train_test_split["test"]
+    # import ipdb; ipdb.set_trace()  # noqa
     # filter with minimal length 100
     model, tokenizer, prompt_tokens = creat_model_tokenizer4training(
         dev, lora_r=lora_r)
@@ -65,6 +66,7 @@ def finetune(ctx,
     def tokenize_function(examples):
         all_tokens_batch = []
         attention_mask_batch = []
+        label_mask_batch = []
         for code in examples["code"]:
             # here insert left, middle right
             snippet = substring_or_original(code)
@@ -75,8 +77,9 @@ def finetune(ctx,
                 prompt_tokens_length+1, len(all_tokens))
             # tokenizer.decode(all_tokens[:completion_point])
             # tokenizer.decode(all_tokens[completion_point:])
-            attention_mask = [0 for _ in range(
+            label_mask = [0 for _ in range(
                 completion_point)] + [1 for _ in range(len(all_tokens) - completion_point)]
+            attention_mask = [1 for _ in range(len(all_tokens))]
             length_diff = max_length - len(all_tokens)
 
             if length_diff > 0:
@@ -84,15 +87,23 @@ def finetune(ctx,
                     length_diff)] + all_tokens
                 attention_mask = [0 for _ in range(
                     length_diff)] + attention_mask
+                label_mask = [0 for _ in range(
+                    length_diff)] + label_mask
+
             all_tokens_batch.append(copy.deepcopy(all_tokens))
             attention_mask_batch.append(copy.deepcopy(attention_mask))
+            label_mask_batch.append(copy.deepcopy(label_mask))
 
         all_tokens_batch = torch.Tensor(
             all_tokens_batch).type(torch.LongTensor)
         attention_mask_batch = torch.Tensor(
             attention_mask_batch).type(torch.LongTensor)
-        labels = torch.cat([all_tokens_batch[:, 1:], torch.zeros(
-            all_tokens_batch.shape[0], 1).type(torch.LongTensor)-100], dim=-1)
+        label_mask_batch = torch.Tensor(
+            label_mask_batch).type(torch.LongTensor)
+
+        # import ipdb; ipdb.set_trace()  # noqa
+        labels = ((label_mask_batch == 1).float()*all_tokens_batch -
+                  100 * (label_mask_batch == 0)).type(torch.LongTensor)
 
         return {
             'input_ids': all_tokens_batch,
@@ -100,11 +111,7 @@ def finetune(ctx,
             'labels': labels,
         }
     mbs = 16
-    tokenized_train_dataset = train_dataset.map(
-        tokenize_function, batched=True,
-        batch_size=mbs,
-        num_proc=cores,
-        load_from_cache_file=not dev)
+    # cores = 1
     tokenized_test_dataset = test_dataset.map(
         tokenize_function, batched=True,
         batch_size=mbs,
@@ -134,17 +141,21 @@ def finetune(ctx,
         logging_strategy="steps",
         logging_steps=save_steps//10,
         hub_model_id=hub_model_id,
-        max_grad_norm=10.0,
     )
+    model.config.use_cache = False
+    # for _ in range(10):
     trainer = Trainer(
         model=model,
         tokenizer=tokenizer,
         args=training_args,
-        train_dataset=tokenized_train_dataset,
+        train_dataset=train_dataset.map(
+            tokenize_function, batched=True,
+            batch_size=mbs,
+            num_proc=cores,
+            load_from_cache_file=False),
         eval_dataset=tokenized_test_dataset,
     )
 
-    model.config.use_cache = False
     trainer.train()
     if push:
         trainer.push_to_hub()

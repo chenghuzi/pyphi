@@ -31,8 +31,9 @@ def creat_model_tokenizer4training(dev, lora_r=32) -> Tuple[AutoModelForCausalLM
     lora_f = not dev
 
     if lora_f:
-        target_modules = ['v_proj', 'k_proj',
-                          'q_proj', 'dense', 'fc1', 'fc2']
+        target_modules = ['v_proj',# 'k_proj',
+                          'q_proj', 'dense', # 'fc1', 'fc2'
+                          ]
         print('fully lora')
     else:
         target_modules = ['layers.0.self_attn.v_proj',
@@ -53,6 +54,7 @@ def creat_model_tokenizer4training(dev, lora_r=32) -> Tuple[AutoModelForCausalLM
     model = prepare_model_for_kbit_training(
         model, use_gradient_checkpointing=False)
     model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(
         base_model_id,
